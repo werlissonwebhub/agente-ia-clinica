@@ -10,16 +10,15 @@ from contexto_clinica import CLINICA_CONTEXT
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 
-# Inicializa o cliente oficial do Gemini
+# Inicializa o cliente oficial do novo SDK google-genai
 client = genai.Client(api_key=api_key) if api_key else genai.Client()
 
 app = FastAPI(
     title="Agente IA Estética Primavera - Vercel",
     description="Backend avançado com suporte a histórico, IA e Webhook do Instagram.",
-    version="2.2.0"
+    version="2.3.0"
 )
 
-# Configuração do prompt e modelo
 SYSTEM_PROMPT = f"""
 {CLINICA_CONTEXT}
 
@@ -27,14 +26,9 @@ SYSTEM_PROMPT = f"""
 DIRETRIZES DE COMPORTAMENTO E PRECISÃO (OBRIGATÓRIO):
 1. PRECISÃO ABSOLUTA: Nunca invente valores, datas, procedimentos ou endereços que não constem estritamente no contexto acima.
 2. LIMITAÇÃO DE ESCOPO: Se o cliente fizer uma pergunta sobre um assunto totalmente fora do escopo da clínica ou solicitar informações indisponíveis, responda educadamente com o fallback: "Para que eu possa te dar uma informação exata sobre isso, vou te transferir agora mesmo para um de nossos atendentes humanos no WhatsApp oficial."
-3. FOCO EM CONVERSÃO: Sempre termine as respostas engajando o cliente (ex: perguntando se ele prefere atendimento no período da manhã ou tarde, ou direcionando para o link do WhatsApp).
+3. FOCO EM CONVERSÃO: Sempre termine as respostas engajando o cliente.
 4. FORMATO WHATSAPP/INSTAGRAM: Utilize formatação limpa (negritos com **, emojis moderados e quebras de linha amigáveis).
 """
-
-model = genai.GenerativeModel(
-    model_name="gemini-3.6-flash",
-    system_instruction=SYSTEM_PROMPT
-)
 
 class MensagemItem(BaseModel):
     role: str
@@ -44,13 +38,16 @@ class ChatRequest(BaseModel):
     historico: Optional[List[MensagemItem]] = []
     pergunta_atual: str
 
-@app.post("/chat", summary="Processa o chat com histórico e alta precisão")
+@app.post("/chat", summary="Processa o chat com alta precisão")
 async def processar_chat(dados: ChatRequest):
     try:
-        # Formata o histórico para o novo padrão do cliente genai se necessário, ou usa chat direto
+        # Combina o system instruction e a pergunta atual usando o cliente novo
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model="gemini-3.6-flash",
             contents=dados.pergunta_atual,
+            config={
+                "system_instruction": SYSTEM_PROMPT
+            }
         )
         return {
             "status": "sucesso",
@@ -66,7 +63,6 @@ async def verificar_webhook(request: Request):
     hub_challenge = params.get("hub.challenge")
     hub_verify_token = params.get("hub.verify_token")
     
-    # Token fixo direto para garantir validação
     VERIFY_TOKEN = "esteticaprimaveratoken"
 
     if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
@@ -76,7 +72,6 @@ async def verificar_webhook(request: Request):
 @app.post("/webhook")
 async def receber_mensagem_instagram(request: Request):
     body = await request.json()
-    # Aqui vamos processar a mensagem que chega do Instagram Direct e mandar para o Gemini
     print("Webhook recebido do Instagram:", body)
     return {"status": "recebido"}
 
@@ -84,5 +79,4 @@ async def receber_mensagem_instagram(request: Request):
 async def root():
     return {"status": "online", "servico": "Agente IA Estética Primavera na Vercel Rodando!"}
 
-# Adaptador Mangum para a Vercel ler o FastAPI como função serverless
 handler = Mangum(app)
