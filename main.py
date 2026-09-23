@@ -76,7 +76,6 @@ async def processar_chat(dados: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao processar IA: {str(e)}")
 
-# Rota de Webhook do Instagram (Preparo inicial para receber os eventos da Meta)
 @app.get("/webhook")
 async def verificar_webhook(request: Request):
     params = request.query_params
@@ -84,8 +83,8 @@ async def verificar_webhook(request: Request):
     hub_challenge = params.get("hub.challenge")
     hub_verify_token = params.get("hub.verify_token")
     
-    # Token de verificação que você definirá no painel do Facebook/Instagram
-    VERIFY_TOKEN = os.getenv("INSTAGRAM_VERIFY_TOKEN", "esteticaprimaveratoken")
+    # Token fixo direto para garantir validação
+    VERIFY_TOKEN = "esteticaprimaveratoken"
 
     if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
         return int(hub_challenge) if hub_challenge else "OK"
