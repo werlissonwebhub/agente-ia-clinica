@@ -1,28 +1,22 @@
-# main.py
 import os
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from dotenv import load_dotenv
-import google.generativeai as genai
+from google import genai
 from mangum import Mangum
 from contexto_clinica import CLINICA_CONTEXT
 
-# Carrega as variáveis do ambiente (localmente)
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 
-if not api_key:
-    # Apenas um aviso caso rode sem env local, mas na Vercel configuraremos nas Environment Variables
-    print("Aviso: GEMINI_API_KEY não encontrada no carregamento padrão.")
-
-if api_key:
-    genai.configure(api_key=api_key)
+# Inicializa o cliente oficial do Gemini
+client = genai.Client(api_key=api_key) if api_key else genai.Client()
 
 app = FastAPI(
     title="Agente IA Estética Primavera - Vercel",
     description="Backend avançado com suporte a histórico, IA e Webhook do Instagram.",
-    version="2.1.0"
+    version="2.2.0"
 )
 
 # Configuração do prompt e modelo
@@ -53,22 +47,11 @@ class ChatRequest(BaseModel):
 @app.post("/chat", summary="Processa o chat com histórico e alta precisão")
 async def processar_chat(dados: ChatRequest):
     try:
-        # Garante a chave ativa caso venha da variável de ambiente da Vercel
-        current_key = os.getenv("GEMINI_API_KEY")
-        if current_key:
-            genai.configure(api_key=current_key)
-
-        chat_history = []
-        for msg in dados.historico:
-            role_gemini = "user" if msg.role == "user" else "model"
-            chat_history.append({
-                "role": role_gemini,
-                "parts": [msg.content]
-            })
-
-        chat_sessao = model.start_chat(history=chat_history)
-        response = chat_sessao.send_message(dados.pergunta_atual)
-
+        # Formata o histórico para o novo padrão do cliente genai se necessário, ou usa chat direto
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=dados.pergunta_atual,
+        )
         return {
             "status": "sucesso",
             "resposta_ia": response.text.strip()
